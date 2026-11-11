@@ -1,0 +1,108 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,bm}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+
+\title{Continuation: Circulatory Theodorsen Extension\\[4pt]
+\large Version 2 Scope, Approximations, and Validation Status}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Purpose}
+
+This document is a Version~2 continuation of the main NACA~2412 aeroelastic report.
+It records the additional unsteady-aerodynamic files and their validation status.
+
+This continuation adds a separate frequency-domain unsteady-aerodynamic branch to the
+NACA~2412 aeroelastic project. The original quasi-steady files are preserved. The new
+files evaluate Theodorsen's complex circulatory function, include a low-order
+non-circulatory added-mass approximation, provide a rational approximation option, and
+use a fixed-point $p$--$k$-style iteration to account for reduced-frequency dependence.
+
+\section{Theodorsen Function}
+
+For reduced frequency
+\begin{equation}
+ k=\frac{\omega c}{2U},
+\end{equation}
+the circulatory response is multiplied by
+\begin{equation}
+ C(k)=
+ \frac{H_1^{(2)}(2k)}
+ {H_1^{(2)}(2k)+iH_0^{(2)}(2k)},
+\end{equation}
+where $H_n^{(2)}$ are Hankel functions of the second kind. The zero-frequency limit is
+$C(0)=1$.
+
+\section{Frequency-Dependent Strip Model}
+
+For a trial eigenvalue $s$, the extension uses the circulatory incidence
+\begin{equation}
+ \alpha_c =
+ \theta+\frac{s\,w}{U}
+ +\left(\frac{1}{2}-a_{\rm ea}\right)
+ \frac{c\,s}{U}\theta .
+\end{equation}
+The corresponding strip lift is
+\begin{equation}
+ L'_c=q_\infty c C_{L\alpha}^{3D} C(k)\alpha_c.
+\end{equation}
+The lift sensitivities generate complex, frequency-dependent aerodynamic damping and
+stiffness matrices. The circulatory resultant is applied at the aerodynamic center, so
+the lift-generated moment uses the aerodynamic-center-to-elastic-axis offset.
+
+The implementation also includes a low-order flat-plate added-mass approximation in the
+effective mass and damping matrices. It is suitable for sensitivity studies but should
+be replaced by a fully consistent typical-section derivation for quantitative work.
+
+\section{$p$--$k$-Style Iteration}
+
+The Theodorsen matrices depend on the unknown eigenvalue, so the problem is not a
+standard fixed quadratic eigenvalue problem. At each airspeed and for each mode, the
+new solver:
+\begin{enumerate}
+\item obtains an initial eigenvalue from the existing quasi-steady model;
+\item evaluates $C(k)$ using the current trial frequency;
+\item assembles complex aerodynamic matrices;
+\item solves the resulting state-space eigenproblem;
+\item selects the eigenvalue using displacement-eigenvector MAC, with nearest-eigenvalue
+ fallback when the MAC is inconclusive;
+\item applies relaxation until the eigenvalue converges.
+\end{enumerate}
+
+The resulting frequency and growth-rate histories are approximate $p$--$k$ solutions.
+The \texttt{converged} output identifies modes that satisfy the iteration tolerance.
+The complete-spectrum diagnostic is assembled from the candidate state-space spectra
+evaluated during the converged mode iterations; it is therefore a practical diagnostic,
+not a rigorous nonlinear-spectrum continuation.
+
+\section{New MATLAB Files}
+
+\begin{itemize}
+\item \texttt{theodorsen\_function.m}: evaluates the complex Hankel-function expression
+ for $C(k)$.
+\item \texttt{theodorsen\_rational\_function.m}: evaluates a low-order Jones rational
+ approximation for faster repeated evaluations.
+\item \texttt{unsteady\_aero\_strip\_matrices.m}: assembles complex
+ frequency-dependent strip matrices, including pitch-rate circulatory lift and
+ low-order added-mass terms.
+\item \texttt{theodorsen\_flutter\_sweep.m}: performs the fixed-point $p$--$k$-style
+ airspeed sweep and returns complete-spectrum diagnostics.
+\item \texttt{run\_theodorsen\_analysis.m}: example runner and V--f/V--g plots.
+\item \texttt{sears\_function.m} and \texttt{sears\_gust\_response.m}: harmonic gust
+ transfer and frequency-domain gust response.
+\end{itemize}
+
+\section{Scope and Validation}
+
+The extension is intended for comparison and development, not as a validated production
+flutter solver. It does not yet include rational-function lag states, a full nonlinear
+$p$ method for complex $s$-dependent aerodynamic operators, or finite-wing unsteady
+induced-angle coupling. The added-mass and Sears implementations are explicitly
+low-order strip approximations. Results should therefore be checked against a classical
+typical-section benchmark before quantitative use.
+
+\end{document}

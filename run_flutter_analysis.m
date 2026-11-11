@@ -57,7 +57,8 @@ Cs = alpha_rayleigh*Ms + beta_rayleigh*Ks;   % full-size; reduced inside flutter
 
 %% ------------------------- FLUTTER / VIBRATION SWEEP --------------------
 
-[U_vec, freq_Hz, damping, ~, divergence_indicator, max_growth, ...
+[U_vec, freq_Hz, damping, ~, divergence_indicator, divergence_singular_value, ...
+                       max_growth, ...
                        dominant_eigenvalue, real_eigenvalues] = ...
     flutter_sweep(Ms, Ks, free_dofs, node_y, dof_map, ...
                                 chord, ea_loc_frac, a_ea, AR, e_s, aero, rho, ...
@@ -104,6 +105,12 @@ end
 xlabel('Airspeed U [m/s]');
 ylabel('det(K_r + S_{a,r}) / det(K_r)');
 title('Static-divergence indicator');
+
+figure('Name','Static stiffness singular value');
+plot(U_vec, divergence_singular_value, 'LineWidth', 1.5); grid on;
+xlabel('Airspeed U [m/s]');
+ylabel('\sigma_{min}(K_r+S_{a,r}) / \sigma_{max}(K_r)');
+title('Static stiffness proximity to divergence');
 
 if ~isnan(U_flutter)
     fprintf('First complete-spectrum instability: U_F = %.2f m/s\n', U_flutter);
@@ -165,11 +172,13 @@ fprintf('Dominant growth-rate range: %.6g to %.6g 1/s\n', ...
 U_check = 0.5 * (U_flutter * ~isnan(U_flutter) + U_vec(end) * isnan(U_flutter));
 if isnan(U_flutter); U_check = 0.6*U_vec(end); end
 
-[Da_chk, Sa_chk, ~] = aero_strip_matrices(node_y, dof_map, chord, ea_loc_frac, a_ea, ...
+[Da_chk, Sa_chk, Qstatic_chk] = aero_strip_matrices(node_y, dof_map, chord, ea_loc_frac, a_ea, ...
                                            AR, e_s, aero, U_check, rho);
 Mr = Ms(free_dofs, free_dofs);
 Kr = Ks(free_dofs, free_dofs) + Sa_chk(free_dofs, free_dofs);
 Cr = Cs(free_dofs, free_dofs) + Da_chk(free_dofs, free_dofs);
+q_trim = Kr \ Qstatic_chk(free_dofs);
+fprintf('Static trim norm at U = %.1f m/s: %.6g\n', U_check, norm(q_trim));
 
 n = numel(free_dofs);
 odefun = @(t,z) [z(n+1:end); Mr\(-Cr*z(n+1:end) - Kr*z(1:n))];

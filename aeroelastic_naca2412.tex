@@ -1,0 +1,452 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{bm}
+\usepackage{hyperref}
+
+\title{Aeroelastic Vibration Analysis of a Finite-Span NACA~2412 Wing\\[4pt]
+\large Version 2: FEM, Quasi-Steady Strip Theory, and Exploratory Unsteady Extensions}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Version 2 Scope and Validity}
+
+Version~2 is an extensible aeroelastic analysis framework rather than a validated
+production flutter-prediction tool. The structural finite-element model and the
+quasi-steady strip-theory branch provide a coherent qualitative and engineering
+sensitivity model. The separate Theodorsen branch adds frequency-dependent circulatory
+aerodynamics, a low-order added-mass approximation, a rational Theodorsen approximation,
+and a Sears-based harmonic gust response.
+
+The quasi-steady branch can be used to study trends in modal frequency, growth rate,
+static trim, divergence indicators, and forced response. Absolute flutter speeds and
+displacement amplitudes should not be interpreted as experimental predictions until the
+structural properties, damping, aerodynamic data, and sign conventions have been
+validated against a classical typical-section solution or measured NACA~2412 data.
+
+The Theodorsen branch is exploratory. Its frequency-dependent matrices are evaluated
+within a fixed-point $p$--$k$-style iteration, and its low-order added-mass and Sears
+terms are approximations. Candidate eigenvalue real-part plots are diagnostic and are
+not equivalent to a rigorously continued global nonlinear spectrum. Quantitative use
+requires a validated rational-function state-space realization, complete unsteady
+finite-wing aerodynamics, and benchmark comparison.
+
+\section{Problem Setup}
+
+The wing is idealized as a straight cantilever beam clamped at the root ($y=0$) and
+free at the tip ($y=L$), where $L$ is the semi-span. Each spanwise station has two
+elastic degrees of freedom: a plunge (bending) deflection $h(y,t)$, positive downward,
+measured at the elastic axis, and a pitch (twist) rotation $\theta(y,t)$, positive
+nose-up, about the same elastic axis. The chord distribution is $c(y)$ and the section
+is a NACA~2412 profile at every station (no spanwise twist or taper assumed, though the
+formulation supports both). The wing flies at freestream speed $U$ and air density
+$\rho$, with dynamic pressure $q_\infty = \tfrac12 \rho U^2$.
+
+The objective is to determine how the wing's vertical (plunge-dominated) vibration
+behaves as $U$ is varied, for a wing of finite span $L$ (finite aspect ratio
+$AR = b^2/S$, where $b=2L$ is the full span and $S$ the planform area).
+
+\section{Structural Model}
+
+\subsection{Continuous governing equations}
+
+Euler--Bernoulli bending and Saint-Venant torsion of a non-uniform beam, each driven by
+the distributed aerodynamic load:
+\begin{align}
+\frac{\partial^2}{\partial y^2}\!\left(EI(y)\,\frac{\partial^2 h}{\partial y^2}\right)
++ m(y)\,\frac{\partial^2 h}{\partial t^2}
+&= L'(y,t), \label{eq:bending}\\[4pt]
+-\frac{\partial}{\partial y}\!\left(GJ(y)\,\frac{\partial \theta}{\partial y}\right)
++ I_\theta(y)\,\frac{\partial^2 \theta}{\partial t^2}
+&= M'_{ea}(y,t), \label{eq:torsion}
+\end{align}
+where $EI(y)$ is bending stiffness, $GJ(y)$ torsional stiffness, $m(y)$ mass per unit
+length, $I_\theta(y)$ mass moment of inertia per unit length about the elastic axis,
+$L'(y,t)$ the aerodynamic lift per unit span, and $M'_{ea}(y,t)$ the aerodynamic pitching
+moment per unit span about the elastic axis.
+
+\subsection{Finite element discretization}
+
+The span is divided into $N_e$ two-node beam elements of length $L_e$. Each node
+carries three degrees of freedom: $\{w,\ w',\ \theta\}$ (transverse deflection, slope,
+twist). For a uniform element the classical consistent mass/stiffness sub-matrices are
+
+\begin{equation}
+\bm{K}^{(e)}_{\text{bend}} = \frac{EI}{L_e^3}
+\begin{bmatrix}
+12 & 6L_e & -12 & 6L_e\\
+6L_e & 4L_e^2 & -6L_e & 2L_e^2\\
+-12 & -6L_e & 12 & -6L_e\\
+6L_e & 2L_e^2 & -6L_e & 4L_e^2
+\end{bmatrix}, \qquad
+\bm{M}^{(e)}_{\text{bend}} = \frac{mL_e}{420}
+\begin{bmatrix}
+156 & 22L_e & 54 & -13L_e\\
+22L_e & 4L_e^2 & 13L_e & -3L_e^2\\
+54 & 13L_e & 156 & -22L_e\\
+-13L_e & -3L_e^2 & -22L_e & 4L_e^2
+\end{bmatrix}
+\end{equation}
+
+acting on $\{w_1,w_1',w_2,w_2'\}$, and the rod-type torsion sub-matrices
+
+\begin{equation}
+\bm{K}^{(e)}_{\text{tors}} = \frac{GJ}{L_e}
+\begin{bmatrix} 1 & -1\\ -1 & 1 \end{bmatrix}, \qquad
+\bm{M}^{(e)}_{\text{tors}} = \frac{I_\theta L_e}{6}
+\begin{bmatrix} 2 & 1\\ 1 & 2 \end{bmatrix}
+\end{equation}
+
+acting on $\{\theta_1,\theta_2\}$. Bending and torsion are structurally uncoupled
+(elastic axis = reference axis), so the two blocks are merged into a single $6\times6$
+element matrix ordered $\{w_1,w_1',\theta_1,w_2,w_2',\theta_2\}$ and assembled into
+global matrices $\bm{M}_s,\bm{K}_s$ by standard FEM assembly. The three root DOFs are
+removed (cantilever condition $w=w'=\theta=0$ at $y=0$), leaving a reduced DOF vector
+$\bm{q}(t)$ of length $3N_e$ (minus 3 removed root DOFs $+3$ trailing-edge-of-root node
+accounting -- i.e. $3N_e$ free DOFs after elimination).
+
+\section{Aerodynamic Model: Quasi-Steady Strip Theory}
+
+\subsection{Local effective incidence}
+
+At spanwise station $y$, the local plunge velocity $\dot h(y,t)$ adds an induced angle
+of attack, so the effective incidence seen by the strip is
+\begin{equation}
+\alpha_{\text{eff}}(y,t) = \theta(y,t) + \frac{\dot h(y,t)}{U}.
+\label{eq:alphaeff}
+\end{equation}
+This is the baseline model implemented below and in the accompanying code. A
+complete quasi-steady treatment also includes a pitch-\emph{rate}-dependent
+circulatory lift term (Theodorsen's quasi-steady limit adds
+$\left(\tfrac12-a\right)\tfrac{c(y)}{U}\dot\theta(y,t)$ inside
+$\alpha_{\text{eff}}$, where $a$ locates the elastic axis as a fraction of
+chord from mid-chord). That term's contribution to the lift is physically
+distinct from the angle-of-attack term above, and critically, it does \emph{not}
+act through the same moment arm $e(y)$ used in
+Eq.~\eqref{eq:moment} below -- its own moment arm about the elastic axis
+requires separate, careful derivation (see Theodorsen~1935, or Hodges \&
+Pierce, \emph{Introduction to Structural Dynamics and Aeroelasticity}). Rather
+than include that term on unverified footing, it is deliberately omitted from
+the baseline formulation and code; Section~7 notes the resulting limitation
+and a safe way to work around it.
+
+\subsection{Section lift and moment}
+
+\begin{align}
+L'(y,t) &= q_\infty\, c(y)\, C_{L\alpha}\,\alpha_{\text{eff}}(y,t), \label{eq:lift}\\
+M'_{ea}(y,t) &= e(y)\,L'(y,t) \;+\; q_\infty\, c(y)^2\, C_{m,ac}, \label{eq:moment}
+\end{align}
+where $e(y)$ is the offset of the aerodynamic center (quarter-chord) ahead of the
+elastic axis, $C_{L\alpha}$ the lift-curve slope, and $C_{m,ac}$ the (camber-induced,
+load-independent) moment coefficient about the aerodynamic center. The $C_{m,ac}$ term
+is a constant, non-linear-in-$(q,\dot q)$ static twisting moment; it contributes to the
+mean trim twist but \emph{not} to the linear dynamic stability matrices below, and is
+tracked separately.
+
+\subsection{Finite-span correction}
+
+Equation~\eqref{eq:lift} uses the 2D (infinite-span) lift-curve slope. For a finite wing
+of aspect ratio $AR$ and span efficiency $e_s$ (Oswald efficiency factor), the
+effective 3D lift-curve slope from Prandtl lifting-line theory is
+\begin{equation}
+C_{L\alpha}^{3D} = \frac{C_{L\alpha}^{2D}}{1 + \dfrac{C_{L\alpha}^{2D}}{\pi\, AR\, e_s}}.
+\label{eq:prandtl}
+\end{equation}
+This reduced slope is used uniformly in Eq.~\eqref{eq:lift} as a first-order finite-span
+correction; a spanwise-varying correction (e.g. via a vortex-lattice induced-angle
+solve) is a natural refinement.
+
+\section{Aeroelastic Coupling: Generalized Equations of Motion}
+
+The FEM shape functions interpolate $h(y,t)$ and $\theta(y,t)$ from the nodal DOF vector
+$\bm{q}(t)$: $h(y,t) = \bm{N}_w(y)\,\bm{q}(t)$, $\theta(y,t) = \bm{N}_\theta(y)\,\bm{q}(t)$.
+
+\textbf{Sign convention.} $h$ (and the nodal DOF $w$) is positive \emph{downward}
+(Section~1), while $L'$ is the physical lift, positive \emph{upward} as is
+standard in aerodynamics. The generalized force conjugate to $w$ is therefore
+$-L'$: an upward lift resists an increase in downward deflection. This is the
+classical typical-section convention (e.g.\ Hodges \& Pierce; Wright \&
+Cooper), $m\ddot h + K h = -L'$, together with $I_\theta \ddot\theta + K\theta =
++M'_{ea}$ for the moment equation ($\theta$ positive nose-up, no sign flip
+needed there).
+
+The spanwise-distributed aerodynamic loads of
+Eqs.~\eqref{eq:lift}--\eqref{eq:moment} are linear in $\bm{q}$ and $\dot{\bm q}$, so the
+generalized aerodynamic force vector, lumped node-by-node (one aerodynamic
+``strip'' per node, matching the discretization request this document
+responds to) rather than integrated against the full FEM shape functions, can
+be written as
+\begin{equation}
+\bm{Q}_{\text{aero}}(t) = -\,\bm{D}_a(U)\,\dot{\bm q}(t) \;-\; \bm{S}_a(U)\,\bm{q}(t)
+\;+\; \bm{Q}_{\text{static}},
+\end{equation}
+with, at node $i$ (local block in the $\{w_i,w_i',\theta_i\}$ ordering, all
+other entries zero),
+\begin{equation}
+\bm S_a^{(i)} = \begin{bmatrix} 0&0&+L'_{,\theta}\\ 0&0&0\\ 0&0&-M'_{,\theta}\end{bmatrix}\Delta y_i,
+\qquad
+\bm D_a^{(i)} = \begin{bmatrix} +L'_{,\dot h}&0&0\\ 0&0&0\\ -M'_{,\dot h}&0&0\end{bmatrix}\Delta y_i,
+\end{equation}
+where $L'_{,\theta}=q_\infty c\,C_{L\alpha}^{3D}$, $L'_{,\dot h}=q_\infty c\,
+C_{L\alpha}^{3D}/U$, and $M'_{,(\cdot)} = e(y)\,L'_{,(\cdot)}$ (from
+Eq.~\eqref{eq:moment}, dynamic part only), and $\Delta y_i$ is node $i$'s
+tributary span width (half of each adjacent element). $\bm D_a$ is the
+\emph{aerodynamic damping matrix} and $\bm S_a$ the \emph{aerodynamic stiffness
+matrix}; both scale with $q_\infty \propto U^2$ except for the $\dot h/U$-based
+entries, which scale linearly in $U$. The slope DOF $w'$ carries no direct
+aerodynamic generalized force in this lumped, strip-per-node treatment -- a
+consistent shape-function-weighted integral would add one; this is a
+deliberate simplification matching the ``divide the span into sections''
+formulation requested.
+
+The coupled linear equations of motion are then
+\begin{equation}
+\bm M_s\,\ddot{\bm q} + \big(\bm C_s + \bm D_a(U)\big)\,\dot{\bm q}
++ \big(\bm K_s + \bm S_a(U)\big)\,\bm q = \bm 0,
+\label{eq:coupled}
+\end{equation}
+where $\bm C_s$ is structural damping (often a small Rayleigh damping matrix,
+$\bm C_s = \alpha \bm M_s + \beta \bm K_s$).
+
+\section{Flutter / Stability Analysis (p-method)}
+
+Assume a solution of the form $\bm q(t) = \hat{\bm q}\, e^{st}$. Substitution into
+Eq.~\eqref{eq:coupled} gives the quadratic eigenvalue problem
+\begin{equation}
+\Big[s^2 \bm M_s + s\big(\bm C_s + \bm D_a(U)\big) + \big(\bm K_s + \bm S_a(U)\big)\Big]
+\hat{\bm q} = \bm 0,
+\label{eq:eig}
+\end{equation}
+solved at each trial airspeed $U$ (e.g. via linearization to a first-order state-space
+form and a standard eigenvalue solver). Each eigenvalue $s_k(U) = \sigma_k(U) \pm
+i\,\omega_k(U)$ gives, at that speed, a modal frequency $f_k = \omega_k/2\pi$ and a
+damping ratio $g_k = -\sigma_k/\omega_k$ (or equivalently $\sigma_k$ itself).
+
+\begin{itemize}
+\item \textbf{V--f diagram}: $\omega_k(U)/2\pi$ vs.\ $U$ for each mode; flutter is
+indicated where two modal frequencies approach one another (coalescence).
+\item \textbf{V--g diagram}: $\sigma_k(U)$ (or $g_k$) vs.\ $U$; the \emph{flutter speed}
+$U_F$ is the lowest $U$ at which any $\sigma_k$ crosses zero from negative (damped) to
+positive (unstable).
+\item \textbf{Torsional divergence} is a static ($\omega=0$) instability and shows up
+separately as $\det(\bm K_s + \bm S_a(U)) \to 0$.
+\end{itemize}
+
+In the implementation, the complete state-space spectrum is retained by default rather
+than truncating the search to a prescribed number of modes. Oscillatory branches are
+continued between adjacent airspeeds using eigenvector modal assurance criterion (MAC)
+correlation. If a branch becomes real or overdamped, its oscillatory frequency and growth
+rate are recorded as unavailable ($\mathrm{NaN}$) rather than being replaced by another
+mode. The real eigenvalues are retained and plotted separately. Dynamic instability is
+reported directly from
+\begin{equation}
+ \sigma_{\max}(U)=\max_k \Re(s_k(U)),
+\end{equation}
+using the complete spectrum, including real eigenvalues; the first speed where
+$\sigma_{\max}\geq 0$ is the reported instability speed.
+Static divergence is checked independently using the normalized indicator
+\begin{equation}
+ d_D(U) =
+ \frac{\det(\bm K_{s,r}+\bm S_{a,r}(U))}
+ {\det(\bm K_{s,r})},
+\end{equation}
+where the subscript $r$ denotes the free (cantilever) DOFs. A sign change in $d_D$
+brackets a divergence speed; the determinant indicator is not used as a substitute for
+the dynamic flutter test.
+
+For $U < U_F$, forced response to gusts/turbulence (replacing the RHS of
+Eq.~\eqref{eq:coupled} with a stochastic or deterministic gust-force vector) gives the
+finite vertical vibration amplitude at the tip, root, or any station of interest; this
+amplitude grows sharply as $U \to U_F$ because the effective damping of the governing
+mode approaches zero.
+
+The companion code also provides a prescribed vertical-gust response. For a gust velocity
+$w_g(t)$, the additional local incidence is $\alpha_g=w_g/U$, giving
+\begin{equation}
+ L'_g(y,t)=q_\infty c(y)C_{L\alpha}^{3D}\frac{w_g(t)}{U},\qquad
+ Q_{w,g}=-L'_g\Delta y,\qquad Q_{\theta,g}=e(y)L'_g\Delta y.
+\end{equation}
+These generalized forces are assembled node-by-node and applied on the right-hand side
+of the time-domain equations. The supplied example uses a sinusoidal gust; the same
+interface accepts an impulse, one-minus-cosine gust, or stochastic gust function.
+
+\section{NACA 2412 Aerodynamic Data}
+
+\begin{itemize}
+\item Thin-airfoil lift-curve slope: $C_{L\alpha}^{2D} = 2\pi\ \text{rad}^{-1}$
+(theoretical); experimentally, finite-thickness/viscous effects typically give
+$C_{L\alpha}^{2D} \approx 5.7$--$6.3\ \text{rad}^{-1}$ at low Mach, pre-stall.
+\item Zero-lift angle of attack (due to camber): $\alpha_0 \approx -2.1^\circ$.
+\item Moment coefficient about the aerodynamic center (quarter-chord), essentially
+constant pre-stall: $C_{m,ac} \approx -0.045$ to $-0.05$.
+\item Aerodynamic center location: $\approx 0.24$--$0.25\,c$ from the leading edge.
+\end{itemize}
+These feed directly into Eqs.~\eqref{eq:lift}--\eqref{eq:moment} as the per-section
+aerodynamic properties, uniform along the span if the wing is untapered and untwisted.
+
+\section{Numerical Implementation Correspondence}
+
+The companion MATLAB code mirrors this document one section at a time:
+\begin{enumerate}
+\item \texttt{naca2412\_data.m} --- Section~6 aerodynamic coefficients.
+\item \texttt{beam\_fem\_matrices.m} --- Section~2.2, assembling $\bm M_s,\bm K_s$.
+\item \texttt{aero\_strip\_matrices.m} --- Section~3--4, building $\bm D_a(U)$,
+$\bm S_a(U)$ from strip integration with the finite-span correction of
+Eq.~\eqref{eq:prandtl}.
+\item \texttt{flutter\_sweep.m} --- Section~5, sweeping $U$, solving
+Eq.~\eqref{eq:eig}, retaining the complete spectrum, MAC-tracking oscillatory modes,
+separating real eigenvalues, checking the static divergence indicator, and returning
+the dominant eigenvalue.
+\item \texttt{gust\_response.m} --- prescribed vertical-gust forcing and time-domain
+integration of the coupled system below a selected flight speed.
+\end{enumerate}
+
+The parameter $a_{\rm ea}$ is passed through the aerodynamic interface but is unused by
+the baseline model. It would enter the omitted pitch-rate circulatory contribution
+$({1}/{2}-a_{\rm ea})c\dot\theta/U$. That contribution has a distinct aerodynamic
+moment arm and is therefore not inserted using the angle-of-attack moment arm $e(y)$
+without a separate checked derivation.
+
+\section{MATLAB Code Block Guide}
+
+This section describes the role of the principal code blocks in the MATLAB files and
+their correspondence with the equations above.
+
+\subsection{\texttt{naca2412\_data.m}: section data}
+
+The function \texttt{naca2412\_data} creates the \texttt{aero} structure used by the
+aerodynamic routines. The fields are:
+\begin{itemize}
+\item \texttt{Cl\_alpha\_2D}: the two-dimensional lift-curve slope;
+\item \texttt{alpha0}: the measured zero-lift angle of attack;
+\item \texttt{Cm\_ac}: the quarter-chord pitching-moment coefficient;
+\item \texttt{ac\_loc}: the aerodynamic-center chordwise location.
+\end{itemize}
+The current linear stability matrices use \texttt{Cl\_alpha\_2D}, \texttt{Cm\_ac}, and
+\texttt{ac\_loc}. The \texttt{alpha0} value is stored for static trim and extended
+section-load calculations but is not included in the present dynamic matrices.
+
+\subsection{\texttt{beam\_fem\_matrices.m}: structural assembly}
+
+The input block defines the span mesh and evaluates any spanwise-varying structural
+properties at each element midpoint. For every two-node element, the code then:
+\begin{enumerate}
+\item constructs the $4\times4$ Euler--Bernoulli bending stiffness and consistent mass
+matrices;
+\item constructs the $2\times2$ rod-type torsional stiffness and mass matrices;
+\item embeds these submatrices in a $6\times6$ element matrix ordered as
+ $\{w_1,w'_1,\theta_1,w_2,w'_2,\theta_2\}$;
+\item scatters the element matrices into the global $\bm K_s$ and $\bm M_s$ matrices.
+\end{enumerate}
+The final block removes the three root DOFs and returns \texttt{free\_dofs}, which is
+used to form the cantilever system for all subsequent calculations.
+
+\subsection{\texttt{aero\_strip\_matrices.m}: strip loads}
+
+This function first evaluates
+\begin{equation}
+ C_{L\alpha}^{3D}
+ =
+ \frac{C_{L\alpha}^{2D}}
+ {1+C_{L\alpha}^{2D}/(\pi AR e_s)}
+\end{equation}
+and computes a tributary span width for every node. The loop over nodes evaluates the
+local chord and the aerodynamic-center-to-elastic-axis offset
+$e=(x_{ea}-x_{ac})c$. It then forms the lift sensitivities
+\begin{equation}
+ \frac{\partial L}{\partial\theta}
+ =q_\infty c C_{L\alpha}^{3D}\Delta y,\qquad
+ \frac{\partial L}{\partial\dot w}
+ =\frac{q_\infty c C_{L\alpha}^{3D}}{U}\Delta y.
+\end{equation}
+These sensitivities are placed into the local $3\times3$ aerodynamic stiffness and
+damping blocks. The slope DOF $w'$ receives no direct load in this lumped strip
+approximation. The function also returns \texttt{Qstatic}, which contains the static
+camber-induced lift and pitching-moment contributions and is separate from the linear
+stability matrices.
+
+\subsection{\texttt{flutter\_sweep.m}: eigenvalue sweep and tracking}
+
+For each airspeed, the function:
+\begin{enumerate}
+\item reduces $\bm M_s$, $\bm K_s$, and $\bm C_s$ to the free DOFs;
+\item obtains $\bm D_a(U)$ and $\bm S_a(U)$ from
+ \texttt{aero\_strip\_matrices};
+\item forms the state matrix
+\begin{equation}
+ \bm A(U)=
+ \begin{bmatrix}
+ \bm 0 & \bm I\\
+ -\bm M_r^{-1}(\bm K_r+\bm S_{a,r}) &
+ -\bm M_r^{-1}(\bm C_r+\bm D_{a,r})
+ \end{bmatrix};
+\end{equation}
+\item computes the complete eigenvalue set $s_k(U)$;
+\item stores the eigenvalue with the largest real part as the dominant stability
+ eigenvalue;
+\item separates real/overdamped eigenvalues from oscillatory eigenvalues;
+\item uses eigenvector MAC correlation to continue oscillatory branches between adjacent
+ airspeeds, leaving an unmatched branch as \texttt{NaN};
+\item evaluates the normalized static-divergence determinant indicator.
+\end{enumerate}
+The returned \texttt{max\_growth} is $\max_k\Re(s_k)$ over the complete spectrum and
+is therefore the quantity used for the first-instability check.
+
+\subsection{\texttt{run\_flutter\_analysis.m}: top-level workflow}
+
+The script is organized into five stages:
+\begin{enumerate}
+\item define geometry, structural properties, damping, and the airspeed grid;
+\item construct the NACA data and structural matrices;
+\item run the aeroelastic eigenvalue sweep;
+\item report the first complete-spectrum instability and the separate divergence
+ diagnostic;
+\item plot the V--f, V--g, real-eigenvalue, and static-divergence diagrams.
+\end{enumerate}
+The final blocks select a check speed, integrate an initial-condition response using
+\texttt{ode45}, and then call \texttt{gust\_response} for a prescribed sinusoidal
+vertical gust.
+
+\subsection{\texttt{gust\_response.m}: forced response}
+
+The gust function converts a prescribed vertical gust velocity $w_g(t)$ into an
+additional incidence $\alpha_g=w_g/U$. At every node it forms the gust lift
+$L'_g=q_\infty c C_{L\alpha}^{3D}\alpha_g\Delta y$ and assembles the generalized
+force components
+\begin{equation}
+ Q_{w,g}=-L'_g,\qquad Q_{\theta,g}=eL'_g.
+\end{equation}
+The reduced forced state equation is then integrated with \texttt{ode45}. The returned
+\texttt{F\_hist} records the applied generalized gust force at the solver output times.
+
+\textbf{Note on validation.} This is a first-principles quasi-steady strip-theory
+template, not a pre-validated production tool. The matrix assembly was checked with an
+independent re-implementation (structural $\bm M_s,\bm K_s$ symmetric and positive
+definite on the free DOFs; the lowest cantilever bending/torsion frequencies match
+beam-theory expectations; the plunge-dominated mode is stably damped at low airspeed
+and becomes unstable only above a finite crossing speed, matching the expected
+single-mode-becomes-unstable flutter pattern). Known limitations to be aware of before
+trusting absolute numbers:
+\begin{itemize}
+\item \textbf{No torsional aerodynamic damping term} is included (Section~3.1):
+the torsion-dominated mode can show a very weak instability even at low airspeed if
+structural damping $\bm C_s$ is left at exactly zero. \texttt{run\_flutter\_analysis.m}
+defaults to a small nonzero Rayleigh $\beta$ specifically to avoid this; replace it with
+measured/estimated structural damping, or implement the omitted pitch-rate circulatory
+term from a checked reference, for quantitative work.
+\item No unsteady lag (Theodorsen's $C(k)$) or finite-span-varying induced angle
+(vortex-lattice) is included -- both are noted as natural refinements in
+Sections~3.3 and~7's companion code.
+\item The gust response is a prescribed external-forcing calculation; it does not include
+gust alleviation, unsteady aerodynamic lag, or a turbulence spectrum unless those are
+supplied through the gust-velocity function.
+\end{itemize}
+Sanity-checking further against a classical closed-form case (e.g.\ Theodorsen's
+flat-plate typical-section result) or a published NACA~2412 wind-tunnel/flutter test is
+still recommended before using this for anything beyond a qualitative/teaching tool.
+
+\end{document}

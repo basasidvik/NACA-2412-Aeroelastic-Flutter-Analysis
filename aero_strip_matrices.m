@@ -25,9 +25,9 @@ function [Da, Sa, Qstatic] = aero_strip_matrices(node_y, dof_map, c_dist, ea_loc
 %               to be added to the structural matrices as
 %                   Ms*qdd + (Cs + Da)*qd + (Ks + Sa)*q = 0
 %               (reduce with free_dofs exactly as Ms, Ks are reduced before use)
-%   Qstatic   : generalized static/trim aerodynamic force vector (from camber
-%               moment Cm_ac), FULL size 3*n_nodes -- not part of the linear
-%               stability matrices, used only for static trim/deflection checks.
+%   Qstatic   : generalized static/trim aerodynamic force vector (from alpha0
+%               and Cm_ac), FULL size 3*n_nodes -- not part of the linear
+%               stability matrices, used for static trim/deflection checks.
 %
 % Modeling notes
 %   - Each node is treated as one aerodynamic "strip" of width equal to the
@@ -114,7 +114,15 @@ function [Da, Sa, Qstatic] = aero_strip_matrices(node_y, dof_map, c_dist, ea_loc
         Da(g,g) = Da(g,g) + Da_local;
 
         % Static camber-moment contribution (not part of Da/Sa)
+        if isfield(aero,'alpha0')
+            alpha0 = aero.alpha0;
+        else
+            alpha0 = 0;
+        end
+        Lstatic = q_inf * ci * ClA3D * (-alpha0) * dy(i);
         Mstatic = q_inf * ci^2 * aero.Cm_ac * dy(i);
+        Qstatic(g(1)) = Qstatic(g(1)) - Lstatic;
+        Qstatic(g(3)) = Qstatic(g(3)) + ei*Lstatic;
         Qstatic(g(3)) = Qstatic(g(3)) + Mstatic;
     end
 
