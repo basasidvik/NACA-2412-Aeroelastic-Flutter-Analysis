@@ -188,7 +188,7 @@ z0 = zeros(2*n,1);
 tip_w_local = find(free_dofs == dof_map(end,1));
 z0(tip_w_local) = 0.01;   % 1 cm initial tip displacement
 
-[t, Z] = ode45(odefun, [0 2], z0);
+[t, Z] = ode15s(odefun, [0 2], z0);
 
 figure('Name','Tip vertical vibration time history');
 plot(t, Z(:, tip_w_local), 'LineWidth', 1.5); grid on;

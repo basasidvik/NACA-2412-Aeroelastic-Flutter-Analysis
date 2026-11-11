@@ -43,7 +43,9 @@ function [t, Z, F_hist] = gust_response(Ms, Ks, Cs, free_dofs, node_y, dof_map, 
     odefun = @(tt,z) [z(n+1:end); Mr \ (force_at_time(tt) - ...
                          Cr*z(n+1:end) - Kr*z(1:n))];
 
-    [t, Z] = ode45(odefun, t_span, z0);
+    % The full FEM system contains widely separated frequencies and is
+    % stiff; ode15s avoids the impractical step sizes required by ode45.
+    [t, Z] = ode15s(odefun, t_span, z0);
     F_hist = zeros(numel(t), n);
     for k = 1:numel(t)
         F_hist(k,:) = force_at_time(t(k)).';

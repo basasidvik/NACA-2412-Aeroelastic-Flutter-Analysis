@@ -408,8 +408,9 @@ The script is organized into five stages:
 \item plot the V--f, V--g, real-eigenvalue, and static-divergence diagrams.
 \end{enumerate}
 The final blocks select a check speed, integrate an initial-condition response using
-\texttt{ode45}, and then call \texttt{gust\_response} for a prescribed sinusoidal
-vertical gust.
+\texttt{ode15s}, and then call \texttt{gust\_response} for a prescribed sinusoidal
+vertical gust. The stiff full-FEM time integration is therefore handled by a
+stiff-system solver rather than \texttt{ode45}.
 
 \subsection{\texttt{gust\_response.m}: forced response}
 
@@ -420,8 +421,19 @@ force components
 \begin{equation}
  Q_{w,g}=-L'_g,\qquad Q_{\theta,g}=eL'_g.
 \end{equation}
-The reduced forced state equation is then integrated with \texttt{ode45}. The returned
+The reduced forced state equation is then integrated with \texttt{ode15s}. The returned
 \texttt{F\_hist} records the applied generalized gust force at the solver output times.
+
+\subsection{\texttt{modal\_gust\_response.m} and
+\texttt{run\_time\_convergence\_study.m}}
+
+\texttt{modal\_gust\_response} calculates the lowest structural modes from the full FEM
+mass and stiffness matrices, projects the aerodynamic matrices and gust forces into a
+selected modal basis, and integrates the reduced stiff system with \texttt{ode15s}.
+\texttt{run\_time\_convergence\_study.m} compares four, eight, and twelve retained modes
+using side-by-side tip-displacement histories, an overlay plot, and relative error
+against the twelve-mode response. Modal truncation is therefore treated as a
+convergence parameter rather than assumed to be accurate a priori.
 
 \textbf{Note on validation.} This is a first-principles quasi-steady strip-theory
 template, not a pre-validated production tool. The matrix assembly was checked with an
