@@ -1,4 +1,3 @@
-# NACA-2412-airfoil-vibration-response
 # NACA 2412 Aeroelastic Flutter Analysis
 
 MATLAB implementation of a finite-span NACA 2412 wing aeroelastic model using Euler–Bernoulli beam finite elements and quasi-steady strip theory.
