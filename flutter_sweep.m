@@ -1,5 +1,6 @@
 function [U_vec, freq_Hz, damping, A_hist, divergence_indicator, ...
-          max_growth, dominant_eigenvalue, real_eigenvalues] = ...
+          divergence_singular_value, max_growth, dominant_eigenvalue, ...
+          real_eigenvalues] = ...
           flutter_sweep(Ms, Ks, free_dofs, node_y, dof_map, c_dist, ...
                         ea_loc_frac, a_ea, AR, e_s, aero, rho, U_vec, ...
                         n_modes_keep, Cs)
@@ -42,6 +43,7 @@ function [U_vec, freq_Hz, damping, A_hist, divergence_indicator, ...
     damping = nan(n_modes_keep, nU);
     A_hist = cell(1,nU);
     divergence_indicator = nan(1,nU);
+    divergence_singular_value = nan(1,nU);
     max_growth = nan(1,nU);
     dominant_eigenvalue = nan(1,nU);
     real_eigenvalues = nan(2*n, nU);
@@ -68,6 +70,8 @@ function [U_vec, freq_Hz, damping, A_hist, divergence_indicator, ...
         Ceff = Cr + Dar;
 
         divergence_indicator(k) = real(det(Keff) / det_Kr);
+        stiffness_scale = max(svd(Kr));
+        divergence_singular_value(k) = min(svd(Keff)) / stiffness_scale;
 
         Minv = Mr \ I;
         A = [Z, I; -Minv*Keff, -Minv*Ceff];
@@ -108,10 +112,13 @@ function [U_vec, freq_Hz, damping, A_hist, divergence_indicator, ...
                                             previous_valid <= n_modes_keep);
             if ~isempty(previous_valid) && ~isempty(osc_V)
                 mac = -Inf(n_modes_keep, numel(osc_s));
-                old_V = previous_vectors(:,previous_valid);
-                mac_valid = abs(old_V' * osc_V).^2;
+                % Use displacement components only. Including qdot would
+                % mix displacement and velocity units in the MAC.
+                old_V = previous_vectors(1:n,previous_valid);
+                new_V = osc_V(1:n,:);
+                mac_valid = abs(old_V' * new_V).^2;
                 mac_valid = mac_valid ./ max(sum(abs(old_V).^2,1).' * ...
-                                             sum(abs(osc_V).^2,1), eps);
+                                             sum(abs(new_V).^2,1), eps);
                 mac(previous_valid,:) = mac_valid;
                 while true
                     available = intersect(previous_valid, find(~assigned_rows));
