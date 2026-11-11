@@ -68,3 +68,55 @@ Consequently, calculated flutter and divergence speeds should be treated as appr
 ## Typical result
 
 For the default parameters, the analysis reports a dynamic instability near 23.5 m/s and no static-divergence crossing within the swept range. Results depend strongly on the structural stiffness, mass distribution, damping, elastic-axis location, and aerodynamic assumptions
+
+# NACA 2412 Aeroelastic Flutter Analysis — Version 2
+
+MATLAB framework for qualitative aeroelastic analysis of a finite-span NACA 2412 wing using beam finite elements, quasi-steady strip theory, and an exploratory unsteady-aerodynamics extension.
+
+## Features
+
+- Euler–Bernoulli bending and Saint-Venant torsion FEM model.
+- Cantilever wing boundary conditions.
+- Finite-span lift-curve correction using Prandtl lifting-line theory.
+- Quasi-steady aerodynamic stiffness and damping matrices.
+- MAC-based oscillatory-mode tracking.
+- Complete-spectrum growth-rate diagnostics.
+- Real and overdamped eigenvalue handling.
+- Static trim from NACA 2412 camber effects.
+- Determinant and singular-value divergence diagnostics.
+- Initial-condition and harmonic gust response.
+- Exploratory Theodorsen circulatory extension.
+- Low-order added-mass approximation.
+- Jones rational approximation of Theodorsen’s function.
+- Sears-based harmonic gust response.
+- V–f, V–g, real-part, divergence, and displacement-comparison plots.
+
+## Main analysis branches
+
+### Quasi-steady branch
+
+Run:
+run_flutter_analysis
+
+This branch provides structural modal analysis, quasi-steady aeroelastic stability, static trim, divergence diagnostics, and forced gust response.
+
+### Theodorsen extension
+
+Run:
+
+run_theodorsen_analysis
+
+This branch uses frequency-dependent circulatory aerodynamics and a fixed-point p–k-style iteration. It also compares quasi-steady and Theodorsen/Sears harmonic displacement responses.
+
+## Documentation
+
+- aeroelastic_naca2412.tex — Version 2 main formulation and MATLAB code guide.
+- aeroelastic_theodorsen_continuation.tex — Theodorsen extension, added-mass approximation, rational approximation, Sears gust model, and validation status.
+
+## Validity and limitations
+
+The structural FEM and quasi-steady strip-theory branches are intended for qualitative analysis, engineering sensitivity studies, and education. They are not validated production flutter-prediction tools.
+
+The Theodorsen branch is exploratory. It includes frequency-dependent circulatory aerodynamics, a low-order added-mass approximation, a rational Theodorsen option, and a Sears-based gust response. It does not yet provide a fully validated nonlinear global aeroelastic spectrum or a complete finite-wing unsteady aerodynamic model.
+
+Absolute flutter speeds and displacement amplitudes should not be treated as experimental predictions until the model is benchmarked against a classical typical-section solution, higher-fidelity aerodynamics, or measured NACA 2412 data
